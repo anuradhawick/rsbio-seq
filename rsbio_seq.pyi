@@ -16,7 +16,7 @@ class Sequence:
     seq: str
     qual: str
 
-class SeqIO:
+class SeqReader:
     """
     Sequence reader.
     """
@@ -39,4 +39,4 @@ class SeqIO:
         """
         ...
 
-__all__ = ["Sequence", "SeqIO"]
+__all__ = ["Sequence", "SeqReader"]

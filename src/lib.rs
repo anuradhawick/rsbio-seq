@@ -5,12 +5,12 @@ use std::io::Read;
 
 /// Sequence reader
 #[pyclass]
-pub struct SeqIO {
+pub struct SeqReader {
     records: Sequences<std::io::BufReader<Box<dyn Read + Send + Sync>>>,
 }
 
 #[pymethods]
-impl SeqIO {
+impl SeqReader {
     /// Initialise a sequence reader for a file in some destination
     #[new]
     #[pyo3(signature = (path))]
@@ -38,6 +38,6 @@ impl SeqIO {
 #[pymodule]
 fn rsbio_seq(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Sequence>()?;
-    m.add_class::<SeqIO>()?;
+    m.add_class::<SeqReader>()?;
     Ok(())
 }

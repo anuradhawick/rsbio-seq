@@ -38,9 +38,9 @@ pip install rsbio-seq
 Once installed you can import the library and use as follows.
 
 ```python
-from rsbio_seq import SeqIO
+from rsbio_seq import SeqReader
 
-for seq in SeqIO("path/to/seq.fasta.gz"):
+for seq in SeqReader("path/to/seq.fasta.gz"):
     print(seq.id)
     print(seq.seq)
     # for fastq quality line

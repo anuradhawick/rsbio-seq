@@ -1,13 +1,13 @@
 from tqdm import tqdm
 from Bio import SeqIO as BioSeqIO
 import sys
-from rsbio_seq import SeqIO as RsSeqIO
+from rsbio_seq import SeqReader
 
 
 if __name__ == "__main__":
     assert len(sys.argv) == 3, "Must provide a valid sequence file and format"
     for seq in tqdm(
-        RsSeqIO(sys.argv[1]),
+        SeqReader(sys.argv[1]),
         desc="Rs-iteration",
     ):
         pass
