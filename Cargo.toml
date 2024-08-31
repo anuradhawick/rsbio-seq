@@ -2,7 +2,7 @@
 name = "rsbio-seq"
 version = "0.1.0"
 edition = "2021"
-authors = ["Anuradha Wickramarachchi <anuradhawick@gmail.com>"]
+authors = ["Anuradha Wickramarachchi <anuradhawick@gmail.com>", "Vijini Mallawaarachchi <viji.mallawaarachchi@gmail.com>"]
 description = "RSBio-Seq is a python wrapper for rust bio crate to provide fast sequence reading."
 readme = "README.md"
 license-file = "LICENSE"
