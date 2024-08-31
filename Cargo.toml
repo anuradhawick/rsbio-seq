@@ -1,0 +1,18 @@
+[package]
+name = "rsbio-seq"
+version = "0.1.0"
+edition = "2021"
+authors = ["Anuradha Wickramarachchi <anuradhawick@gmail.com>"]
+description = "RSBio-Seq is a python wrapper for rust bio crate to provide fast sequence reading."
+readme = "README.md"
+license-file = "LICENSE"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "rsbio_seq"
+crate-type = ["cdylib"]
+
+[dependencies]
+bio = "2.0.1"
+flate2 = "1.0.33"
+pyo3 = { version = "0.22.0", features = ["abi3-py39"] }
