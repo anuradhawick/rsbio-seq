@@ -1,10 +1,11 @@
-from rsbio_seq import SeqReader, Sequence
 import pathlib
+
+from rsbio_seq import SeqReader, Sequence
 
 dir = pathlib.Path(__file__).parent
 
 
-def test_fa():
+def test_read_fa():
     seqs = SeqReader(dir.joinpath("../test_data/reads.fa").as_posix())
     seq: Sequence = next(seqs)
     assert seq.id == "Record_1"
@@ -20,7 +21,7 @@ def test_fa():
     )
 
 
-def test_fa_gz():
+def test_read_fa_gz():
     seqs = SeqReader(dir.joinpath("../test_data/reads.fa.gz").as_posix())
     seq: Sequence = next(seqs)
     assert seq.id == "Record_1"
@@ -36,7 +37,7 @@ def test_fa_gz():
     )
 
 
-def test_fq():
+def test_read_fq():
     seqs = SeqReader(dir.joinpath("../test_data/reads.fq").as_posix())
     seq: Sequence = next(seqs)
     assert seq.id == "Read_1"
@@ -60,7 +61,7 @@ def test_fq():
     )
 
 
-def test_fq_gz():
+def test_read_fq_gz():
     seqs = SeqReader(dir.joinpath("../test_data/reads.fq.gz").as_posix())
     seq: Sequence = next(seqs)
     assert seq.id == "Read_1"

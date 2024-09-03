@@ -1,10 +1,10 @@
 mod reader;
 mod seq;
 mod writer;
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyIOError, prelude::*};
 use reader::{get_reader, Sequences};
 use seq::{SeqFormat, Sequence};
-use std::io::{Read, Write};
+use std::io::Read;
 use writer::{get_writer, Writer};
 
 /// Sequence reader
@@ -18,13 +18,13 @@ impl SeqReader {
     /// Initialise a sequence reader for a file in some destination
     #[new]
     #[pyo3(signature = (path))]
-    pub fn new(path: String) -> Self {
-        let reader = get_reader(&path).unwrap();
-        let format = SeqFormat::get(&path).expect("Unable to detect file format");
+    pub fn new(path: String) -> PyResult<Self> {
+        let reader = get_reader(&path).map_err(PyIOError::new_err)?;
+        let format = SeqFormat::get(&path).map_err(PyIOError::new_err)?;
 
-        Self {
-            records: Sequences::new(format, reader).unwrap(),
-        }
+        Ok(Self {
+            records: Sequences::new(format, reader),
+        })
     }
 
     /// Iterator object
@@ -42,28 +42,31 @@ impl SeqReader {
 #[pyclass]
 pub struct SeqWriter {
     // records: Sequences<std::io::BufReader<Box<dyn Read + Send + Sync>>>,
-    writer: Writer<Box<dyn Write + Send + Sync>>,
+    writer: Writer,
 }
 
 #[pymethods]
 impl SeqWriter {
-    /// Initialise a sequence reader for a file in some destination
+    /// Initialise a sequence writer for a file in some destination
     #[new]
     #[pyo3(signature = (path))]
-    pub fn new(path: String) -> Self {
-        let writer = get_writer(&path).unwrap();
-        let format = SeqFormat::get(&path).expect("Unable to detect file format");
+    pub fn new(path: String) -> PyResult<Self> {
+        let writer = get_writer(&path).map_err(PyIOError::new_err)?;
+        let format = SeqFormat::get(&path).map_err(PyIOError::new_err)?;
 
-        Self {
-            writer: Writer::new(format, Box::new(writer)),
-        }
+        Ok(Self {
+            writer: Writer::new(format, writer),
+        })
     }
 
-    fn test(&self) {}
-
     #[pyo3(signature = (seq, wrap=None))]
-    pub fn write(&mut self, seq: Sequence, wrap: Option<u32>) {
-        self.writer.write(seq, wrap).unwrap();
+    pub fn write(&mut self, seq: Sequence, wrap: Option<u32>) -> PyResult<()> {
+        self.writer.write(seq, wrap).map_err(PyIOError::new_err)
+    }
+
+    #[pyo3(signature = ())]
+    pub fn close(&mut self) -> PyResult<()> {
+        self.writer.close().map_err(PyIOError::new_err)
     }
 }
 
@@ -72,5 +75,6 @@ impl SeqWriter {
 fn rsbio_seq(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Sequence>()?;
     m.add_class::<SeqReader>()?;
+    m.add_class::<SeqWriter>()?;
     Ok(())
 }

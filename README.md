@@ -1,6 +1,8 @@
 # RSBio-Seq
 
 [![Cargo tests](https://github.com/anuradhawick/rsbio-seq/actions/workflows/rust_test.yml/badge.svg)](https://github.com/anuradhawick/rsbio-seq/actions/workflows/rust_test.yml)
+[![Downloads](https://static.pepy.tech/badge/rsbio-seq)](https://pepy.tech/project/rsbio-seq)
+![PyPI - Version](https://img.shields.io/pypi/v/rsbio-seq)
 
 RSBio intends to provide just reading facility on common sequence formats (FASTA/FASTQ) in both raw and compressed formats.
 
@@ -38,8 +40,9 @@ pip install rsbio-seq
 Once installed you can import the library and use as follows.
 
 ```python
-from rsbio_seq import SeqReader
+from rsbio_seq import SeqReader, SeqWriter, Sequence
 
+# reading
 for seq in SeqReader("path/to/seq.fasta.gz"):
     print(seq.id)
     print(seq.seq)
@@ -47,12 +50,27 @@ for seq in SeqReader("path/to/seq.fasta.gz"):
     print(seq.qual)
     # optional description attribute
     print(seq.desc)
+
+# writing fasta
+seq = Sequence("id", "desc", "ACGT") # id, description, sequence
+writer = SeqWriter("out.fasta")
+writer.write(seq)
+writer.close()
+
+# writing fastq
+seq = Sequence("id", "desc", "ACGT") # id, description, sequence
+writer = SeqWriter("out.fastq")
+writer.write(seq)
+writer.close()
+
+# writing gzipped
+seq = Sequence("id", "desc", "ACGT", "IIII") # id, description, sequence, quality
+writer = SeqWriter("out.fq.gz")
+writer.write(seq)
+writer.close()
 ```
 
-## Timeline
-
-- [x] Reading fasta/fastq formats raw and gzipped.
-- [ ] Writing fasta/fastq formats raw and gzipped.
+Note: `close()` is needed if you want to read within the same program scope. Otherwise, rust will automatically do this for you.
 
 ## Authors
 

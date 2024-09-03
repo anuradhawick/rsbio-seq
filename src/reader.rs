@@ -10,19 +10,19 @@ pub struct Sequences<R: BufRead> {
 }
 
 impl<R: BufRead> Sequences<R> {
-    pub fn new(format: SeqFormat, reader: R) -> Result<Self, String> {
+    pub fn new(format: SeqFormat, reader: R) -> Self {
         match format {
             SeqFormat::Fastq => {
                 let fastq_reader = FastqReader::new(reader);
-                Ok(Sequences {
+                Sequences {
                     records: RecordSet::Fastq(fastq_reader.records()),
-                })
+                }
             }
             SeqFormat::Fasta => {
                 let fasta_reader = FastaReader::new(reader);
-                Ok(Sequences {
+                Sequences {
                     records: RecordSet::Fasta(fasta_reader.records()),
-                })
+                }
             }
         }
     }
@@ -94,7 +94,7 @@ mod reader_tests {
     #[test]
     fn load_fq_file_test() {
         let reader = get_reader(PATH_FQ).unwrap();
-        let mut seqs = Sequences::new(SeqFormat::Fastq, reader).unwrap();
+        let mut seqs = Sequences::new(SeqFormat::Fastq, reader);
         let record_1 = seqs.next().unwrap();
         assert_eq!("Read_1", record_1.id);
         assert_eq!(
@@ -114,7 +114,7 @@ mod reader_tests {
     #[test]
     fn load_fq_gz_file_test() {
         let reader = get_reader(PATH_FQ_GZ).unwrap();
-        let mut seqs = Sequences::new(SeqFormat::Fastq, reader).unwrap();
+        let mut seqs = Sequences::new(SeqFormat::Fastq, reader);
         let record_1 = seqs.next().unwrap();
         assert_eq!("Read_1", record_1.id);
         assert_eq!(
@@ -134,7 +134,7 @@ mod reader_tests {
     #[test]
     fn load_fa_file_test() {
         let reader = get_reader(PATH_FA).unwrap();
-        let mut seqs = Sequences::new(SeqFormat::Fasta, reader).unwrap();
+        let mut seqs = Sequences::new(SeqFormat::Fasta, reader);
         let record_1 = seqs.next().unwrap();
         assert_eq!("Record_1", record_1.id);
         assert_eq!(
@@ -154,7 +154,7 @@ mod reader_tests {
     #[test]
     fn load_fa_gz_file_test() {
         let reader = get_reader(PATH_FA_GZ).unwrap();
-        let mut seqs = Sequences::new(SeqFormat::Fasta, reader).unwrap();
+        let mut seqs = Sequences::new(SeqFormat::Fasta, reader);
         let record_1 = seqs.next().unwrap();
         assert_eq!("Record_1", record_1.id);
         assert_eq!(
@@ -175,7 +175,7 @@ mod reader_tests {
     fn parser_test() {
         let input = ">Record_1\nACGTACGTACGT";
         let reader = BufReader::new(input.as_bytes());
-        let mut seqs = Sequences::new(SeqFormat::Fasta, reader).unwrap();
+        let mut seqs = Sequences::new(SeqFormat::Fasta, reader);
         let record_1 = seqs.next().unwrap();
         assert_eq!("Record_1", record_1.id);
         assert_eq!("ACGTACGTACGT", record_1.seq);

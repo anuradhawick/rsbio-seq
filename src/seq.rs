@@ -27,6 +27,21 @@ pub struct Sequence {
     pub qual: String,
 }
 
+#[pymethods]
+impl Sequence {
+    /// Create a new sequence record
+    #[new]
+    #[pyo3(signature = (id, desc, seq, qual="".to_string()))]
+    pub fn new(id: String, desc: String, seq: String, qual: String) -> Self {
+        Self {
+            id,
+            desc,
+            seq,
+            qual,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum SeqFormat {
     Fasta,
@@ -34,16 +49,16 @@ pub enum SeqFormat {
 }
 
 impl SeqFormat {
-    pub fn get(path: &str) -> Option<SeqFormat> {
+    pub fn get(path: &str) -> Result<SeqFormat, String> {
         let mut path = path;
         if path.ends_with(".gz") {
             path = path.trim_end_matches(".gz");
         }
         if path.ends_with(".fq") || path.ends_with(".fastq") {
-            return Some(SeqFormat::Fastq);
+            return Ok(SeqFormat::Fastq);
         } else if path.ends_with(".fasta") || path.ends_with(".fa") || path.ends_with(".fna") {
-            return Some(SeqFormat::Fasta);
+            return Ok(SeqFormat::Fasta);
         }
-        None
+        Err("Format not detected".to_string())
     }
 }
