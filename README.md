@@ -2,7 +2,8 @@
 
 [![Cargo tests](https://github.com/anuradhawick/rsbio-seq/actions/workflows/rust_test.yml/badge.svg)](https://github.com/anuradhawick/rsbio-seq/actions/workflows/rust_test.yml)
 [![Downloads](https://static.pepy.tech/badge/rsbio-seq)](https://pepy.tech/project/rsbio-seq)
-![PyPI - Version](https://img.shields.io/pypi/v/rsbio-seq)
+[![PyPI - Version](https://img.shields.io/pypi/v/rsbio-seq)](https://pypi.org/project/rsbio-seq/)
+[![Upload to PyPI](https://github.com/anuradhawick/rsbio-seq/actions/workflows/pypi.yml/badge.svg?branch=main)](https://github.com/anuradhawick/rsbio-seq/actions/workflows/pypi.yml)
 
 RSBio intends to provide just reading facility on common sequence formats (FASTA/FASTQ) in both raw and compressed formats.
 
