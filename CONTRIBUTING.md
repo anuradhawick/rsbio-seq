@@ -36,6 +36,13 @@ Use the following command to test the build. All tests should pass.
 cargo test
 ```
 
+Use the following commands to run the pytests.
+
+```bash
+pytest tests/write_test.py -v
+pytest tests/read_test.py -v
+```
+
 ## Coding Style
 
 We use [Clippy](https://doc.rust-lang.org/clippy/) to lint code in rsbio-seq.
