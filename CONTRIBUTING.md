@@ -1,34 +1,34 @@
-# Contributing to kmertools project
+# Contributing to rsbio-seq project
 
-We love to have your contributions to the kmertools project, whether it's:
+We love to have your contributions to the rsbio-seq project, whether it's:
 * Reporting a bug
 * Submitting a fix
 * Proposing new features
 
-## Clone and install kmertools onto your machine
+## Clone and install rsbio-seq onto your machine
 
 First, make sure you have [git](https://github.com/git-guides/install-git) and [rust](https://www.rust-lang.org/tools/install) installed on your machine.
 
-On GitHub, [fork](https://docs.github.com/en/get-started/quickstart/fork-a-repo) the kmertools repository and [clone](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) it to your machine.
+On GitHub, [fork](https://docs.github.com/en/get-started/quickstart/fork-a-repo) the rsbio-seq repository and [clone](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) it to your machine.
 
 ```shell
 # clone repository to your local machine
-git clone https://github.com/anuradhawick/kmertools.git
+git clone https://github.com/anuradhawick/rsbio-seq.git
 ```
 
-Move to the kmertools directory 
+Move to the rsbio-seq directory 
 
 ```shell
-cd kmertools
+cd rsbio-seq
 ```
 
-Now build kmertools using cargo. Make sure to have [`rust`](https://docs.conda.io/en/latest/) installed.
+Now build rsbio-seq using cargo. Make sure to have [`rust`](https://docs.conda.io/en/latest/) installed.
 
 ```shell
 cargo build
 ```
 
-## Test kmertools build
+## Test rsbio-seq build
 
 Use the following command to test the build. All tests should pass.
 
@@ -38,7 +38,7 @@ cargo test
 
 ## Coding Style
 
-We use [Clippy](https://doc.rust-lang.org/clippy/) to lint code in kmertools.
+We use [Clippy](https://doc.rust-lang.org/clippy/) to lint code in rsbio-seq.
 
 Before committing, make sure to run Clippy as follows.
 
@@ -48,7 +48,7 @@ cargo clippy
 
 ## Report bugs using GitHub's issues
 
-We use GitHub issues to track public bugs. Report a bug by opening a new issue in GitHub [issues](https://github.com/anuradhawick/kmertools/issues). You will get to select between templates for bug reports and feature requests. If none of these templates matches what you want to report, you can use the custom issue template.
+We use GitHub issues to track public bugs. Report a bug by opening a new issue in GitHub [issues](https://github.com/anuradhawick/rsbio-seq/issues). You will get to select between templates for bug reports and feature requests. If none of these templates matches what you want to report, you can use the custom issue template.
 
 ## Committing code
 
