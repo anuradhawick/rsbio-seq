@@ -5,9 +5,19 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/rsbio-seq)](https://pypi.org/project/rsbio-seq/)
 [![Upload to PyPI](https://github.com/anuradhawick/rsbio-seq/actions/workflows/pypi.yml/badge.svg)](https://github.com/anuradhawick/rsbio-seq/actions/workflows/pypi.yml)
 
-RSBio intends to provide just reading facility on common sequence formats (FASTA/FASTQ) in both raw and compressed formats.
+RSBio-Seq intends to provide just reading facility on common sequence formats (FASTA/FASTQ) in both raw and compressed formats.
 
-## Build and install from source
+## Installation 
+
+### 1. From PyPI (Recommended)
+
+Simple use the following command
+
+```bash
+pip install rsbio-seq
+```
+
+### 2. Build and install from source
 
 To build you need to have the following installed.
 
@@ -20,25 +30,20 @@ maturin develop # this installs the development version in the env
 maturin develop --rust # this installs a release version in the env
 ```
 
-To build a wheel
+To build a wheel for installation
 
 ```bash
 maturin build --release
 ```
 
-You will find the `whl` file inside the `target/wheels` directory.
+You will find the `whl` file inside the `target/wheels` directory. Your `whl` file will have a name depicting your python environment and CPU architecture.
 
-## Install from PyPI
-
-Simple use the following command
-
-```bash
-pip install rsbio-seq
-```
 
 ## Usage
 
 Once installed you can import the library and use as follows.
+
+### Reading
 
 ```python
 from rsbio_seq import SeqReader, SeqWriter, Sequence
@@ -51,7 +56,11 @@ for seq in SeqReader("path/to/seq.fasta.gz"):
     print(seq.qual)
     # optional description attribute
     print(seq.desc)
+```
 
+### Writing
+
+```python
 # writing fasta
 seq = Sequence("id", "desc", "ACGT") # id, description, sequence
 writer = SeqWriter("out.fasta")
