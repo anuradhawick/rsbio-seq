@@ -11,6 +11,12 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version", "readme", "description", "license", "authors"]
+keywords = ["bioinformatics", "genomics"]
+
+[project.urls]
+Documentation = "https://github.com/anuradhawick/rsbio-seq/"
+"Bug Tracker" = "https://github.com/anuradhawick/rsbio-seq/issues"
+"Source Code" = "https://github.com/anuradhawick/rsbio-seq/"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]

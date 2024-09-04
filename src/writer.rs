@@ -2,6 +2,7 @@ use crate::seq::{SeqFormat, Sequence};
 use flate2::{write::GzEncoder, Compression};
 use std::{fs::File, io::Write};
 
+#[inline]
 fn wrap_string_no_whitespace(s: &str, width: usize) -> String {
     let mut result = String::with_capacity(s.len() + s.len() / width);
     let mut i = 0;
@@ -47,11 +48,13 @@ impl Writer {
         }
     }
 
+    #[inline]
     pub fn write(&mut self, seq: Sequence, wrap: Option<u32>) -> Result<(), String> {
         let writer = match &mut self.writer {
             WriterType::Gzip(gz) => gz as &mut dyn Write,
             WriterType::Plain(file) => file as &mut dyn Write,
         };
+
         match self.format {
             SeqFormat::Fasta => {
                 let seq_str = if let Some(wrap) = wrap {
@@ -62,38 +65,33 @@ impl Writer {
                 } else {
                     seq.seq
                 };
-                writer.write_all(b">").map_err(|e| e.to_string())?;
-                writer
-                    .write_all(seq.id.as_bytes())
-                    .map_err(|e| e.to_string())?;
-                writer.write_all(b" ").map_err(|e| e.to_string())?;
-                writer
-                    .write_all(seq.desc.as_bytes())
-                    .map_err(|e| e.to_string())?;
-                writer.write_all(b"\n").map_err(|e| e.to_string())?;
-                writer
-                    .write_all(seq_str.as_bytes())
-                    .map_err(|e| e.to_string())?;
-                writer.write_all(b"\n").map_err(|e| e.to_string())?;
+                let mut buffer =
+                    Vec::with_capacity(4 + seq.id.len() + seq.desc.len() + seq_str.len());
+
+                buffer.extend_from_slice(b">");
+                buffer.extend_from_slice(seq.id.as_bytes());
+                buffer.extend_from_slice(b" ");
+                buffer.extend_from_slice(seq.desc.as_bytes());
+                buffer.extend_from_slice(b"\n");
+                buffer.extend_from_slice(seq_str.as_bytes());
+                buffer.extend_from_slice(b"\n");
+                writer.write_all(&buffer).map_err(|e| e.to_string())?;
             }
             SeqFormat::Fastq => {
-                writer.write_all(b"@").map_err(|e| e.to_string())?;
-                writer
-                    .write_all(seq.id.as_bytes())
-                    .map_err(|e| e.to_string())?;
-                writer.write_all(b" ").map_err(|e| e.to_string())?;
-                writer
-                    .write_all(seq.desc.as_bytes())
-                    .map_err(|e| e.to_string())?;
-                writer.write_all(b"\n").map_err(|e| e.to_string())?;
-                writer
-                    .write_all(seq.seq.as_bytes())
-                    .map_err(|e| e.to_string())?;
-                writer.write_all(b"\n+\n").map_err(|e| e.to_string())?;
-                writer
-                    .write_all(seq.qual.as_bytes())
-                    .map_err(|e| e.to_string())?;
-                writer.write_all(b"\n").map_err(|e| e.to_string())?;
+                let mut buffer = Vec::with_capacity(
+                    7 + seq.id.len() + seq.desc.len() + seq.seq.len() + seq.qual.len(),
+                );
+
+                buffer.extend_from_slice(b"@");
+                buffer.extend_from_slice(seq.id.as_bytes());
+                buffer.extend_from_slice(b" ");
+                buffer.extend_from_slice(seq.desc.as_bytes());
+                buffer.extend_from_slice(b"\n");
+                buffer.extend_from_slice(seq.seq.as_bytes());
+                buffer.extend_from_slice(b"\n+\n");
+                buffer.extend_from_slice(seq.qual.as_bytes());
+                buffer.extend_from_slice(b"\n");
+                writer.write_all(&buffer).map_err(|e| e.to_string())?;
             }
         }
         Ok(())
