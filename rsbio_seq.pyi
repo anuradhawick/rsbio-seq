@@ -1,4 +1,4 @@
-from typing import Iterator, Union
+from typing import Iterator, Union, List
 
 class Sequence:
     """
@@ -83,4 +83,34 @@ class SeqWriter:
         """
         ...
 
-__all__ = ["Sequence", "SeqReader", "SeqWriter"]
+def phred_to_ascii(scores: List[int]) -> str:
+    """
+    Convert a list of Phred scores to a string of ASCII quality values.
+
+    Each Phred score is converted by adding 33 to it (Phred+33 encoding),
+    and then transforming it into the corresponding ASCII character.
+
+    Args:
+        scores (List[int]): A list of integers where each integer represents a Phred score.
+
+    Returns:
+        str: A string where each character represents an ASCII quality value corresponding to the input Phred scores.
+    """
+    ...
+
+def ascii_to_phred(qual: str) -> List[int]:
+    """
+    Convert a string of ASCII quality values back to a list of Phred scores.
+
+    Each ASCII character is converted back to a Phred score by subtracting 33
+    from its ASCII value. This function assumes standard Phred+33 encoding is used.
+
+    Args:
+        qual (str): A string of ASCII characters representing quality scores.
+
+    Returns:
+        List[int]: A list of integers where each integer is a Phred score derived from the input ASCII characters.
+    """
+    ...
+
+__all__ = ["Sequence", "SeqReader", "SeqWriter", "phred_to_ascii", "ascii_to_phred"]

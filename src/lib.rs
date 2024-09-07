@@ -70,11 +70,29 @@ impl SeqWriter {
     }
 }
 
+#[pyfunction]
+pub fn phred_to_ascii(scores: Vec<u8>) -> PyResult<String> {
+    Ok(scores
+        .iter()
+        .map(|&score| (score + 33) as char) // Convert Phred score to ASCII
+        .collect())
+}
+
+#[pyfunction]
+pub fn ascii_to_phred(qual: String) -> PyResult<Vec<u8>> {
+    Ok(qual
+        .chars()
+        .map(|c| (c as u8).saturating_sub(33)) // Convert ASCII to Phred score
+        .collect())
+}
+
 /// Sequence reader for rust
 #[pymodule]
 fn rsbio_seq(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Sequence>()?;
     m.add_class::<SeqReader>()?;
     m.add_class::<SeqWriter>()?;
+    m.add_function(wrap_pyfunction!(phred_to_ascii, m)?)?;
+    m.add_function(wrap_pyfunction!(ascii_to_phred, m)?)?;
     Ok(())
 }
