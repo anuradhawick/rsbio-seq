@@ -1,8 +1,10 @@
-from tqdm import tqdm
-from Bio import SeqIO as BioSeqIO, SeqRecord, Seq
-import sys
 import gzip
-from rsbio_seq import SeqReader, SeqWriter, Sequence
+
+from Bio import Seq
+from Bio import SeqIO as BioSeqIO
+from Bio import SeqRecord
+from rsbio_seq import SeqReader, Sequence, SeqWriter, phred_to_ascii
+from tqdm import tqdm
 
 
 # Generates a specified number of Sequence objects with a repeated "ACGT" sequence.
@@ -26,7 +28,7 @@ def test_fq_seqs_rs(count: int):
     seq = "ACGT" * 1_000_000
     qual_phred = [40, 40, 40, 40] * 1_000_000
     for c in range(count):
-        qual = "".join([chr(x + 33) for x in qual_phred])
+        qual = phred_to_ascii(qual_phred)
         yield Sequence(f"rec_id_{c+1}", f"description_{c+1}", seq, qual)
 
 
