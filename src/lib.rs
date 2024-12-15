@@ -79,10 +79,10 @@ pub fn phred_to_ascii(scores: Vec<u8>) -> PyResult<String> {
 }
 
 #[pyfunction]
-pub fn ascii_to_phred(qual: String) -> PyResult<Vec<u8>> {
+pub fn ascii_to_phred(qual: String) -> PyResult<Vec<u32>> {
     Ok(qual
         .chars()
-        .map(|c| (c as u8).saturating_sub(33)) // Convert ASCII to Phred score
+        .map(|c| (c as u8).saturating_sub(33).into()) // Convert ASCII to Phred score
         .collect())
 }
 

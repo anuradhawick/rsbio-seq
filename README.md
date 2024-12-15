@@ -41,7 +41,7 @@ To build and install the development version of the wheel.
 
 ```bash
 maturin develop # this installs the development version in the env
-maturin develop --rust # this installs a release version in the env
+maturin develop --release # this installs a release version in the env
 ```
 
 To build a release mode wheel for installation, use this command.
