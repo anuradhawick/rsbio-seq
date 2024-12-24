@@ -1,8 +1,13 @@
 mod reader;
+mod reader_indexed;
 mod seq;
 mod writer;
-use pyo3::{exceptions::PyIOError, prelude::*};
+use pyo3::{
+    exceptions::{PyIOError, PyKeyError},
+    prelude::*,
+};
 use reader::{get_reader, Sequences};
+use reader_indexed::IndexedReader;
 use seq::{SeqFormat, Sequence};
 use std::io::Read;
 use writer::{get_writer, Writer};
@@ -35,6 +40,37 @@ impl SeqReader {
     /// Iterate through sequences
     pub fn __next__(mut slf: PyRefMut<'_, Self>) -> Option<Sequence> {
         slf.records.next()
+    }
+}
+
+/// Sequence reader indexed
+#[pyclass]
+pub struct SeqReaderIndexed {
+    reader: IndexedReader,
+}
+
+#[pymethods]
+impl SeqReaderIndexed {
+    /// Initialise a sequence reader for a file in some destination
+    #[new]
+    #[pyo3(signature = (path, index, gzi=None))]
+    pub fn new(path: String, index: String, gzi: Option<String>) -> PyResult<Self> {
+        let format = SeqFormat::get(&path).map_err(PyIOError::new_err)?;
+
+        Ok(Self {
+            reader: IndexedReader::new(format, &path, &index, gzi.as_deref())
+                .map_err(PyIOError::new_err)?,
+        })
+    }
+
+    /// Get record by id
+    pub fn __getitem__(mut slf: PyRefMut<'_, Self>, id: String) -> PyResult<Sequence> {
+        slf.reader.get_record(&id).map_err(PyKeyError::new_err)
+    }
+
+    /// Contain if id is in index
+    pub fn __contains__(slf: PyRef<'_, Self>, id: String) -> bool {
+        slf.reader.has_record(&id)
     }
 }
 
@@ -79,10 +115,10 @@ pub fn phred_to_ascii(scores: Vec<u8>) -> PyResult<String> {
 }
 
 #[pyfunction]
-pub fn ascii_to_phred(qual: String) -> PyResult<Vec<u8>> {
+pub fn ascii_to_phred(qual: String) -> PyResult<Vec<u32>> {
     Ok(qual
         .chars()
-        .map(|c| (c as u8).saturating_sub(33)) // Convert ASCII to Phred score
+        .map(|c| (c as u8).saturating_sub(33).into()) // Convert ASCII to Phred score
         .collect())
 }
 
@@ -92,6 +128,7 @@ fn rsbio_seq(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Sequence>()?;
     m.add_class::<SeqReader>()?;
     m.add_class::<SeqWriter>()?;
+    m.add_class::<SeqReaderIndexed>()?;
     m.add_function(wrap_pyfunction!(phred_to_ascii, m)?)?;
     m.add_function(wrap_pyfunction!(ascii_to_phred, m)?)?;
     Ok(())

@@ -11,7 +11,7 @@ pub enum RecordSet<R: BufRead> {
 
 /// Sequence entry
 #[pyclass]
-#[derive(FromPyObject)]
+#[derive(FromPyObject, PartialEq, Debug)]
 pub struct Sequence {
     /// sequence id
     #[pyo3(get, set)]

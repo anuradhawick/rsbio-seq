@@ -41,7 +41,7 @@ To build and install the development version of the wheel.
 
 ```bash
 maturin develop # this installs the development version in the env
-maturin develop --rust # this installs a release version in the env
+maturin develop --release # this installs a release version in the env
 ```
 
 To build a release mode wheel for installation, use this command.
@@ -77,6 +77,41 @@ for seq in SeqReader("path/to/seq.fasta.gz"):
     # optional description attribute
     print(seq.desc)
 ```
+
+### Reading Indexed Fasta
+
+Index reader supports fasta in raw text and bgzipped formats.
+
+```python
+seqs = SeqReaderIndexed(
+    "path/tp/seq.fa",
+    "path/to/seq.fa.fai"
+)
+seq: Sequence = seqs["Record_1"]
+print(seq.id)
+print(seq.seq)
+print(seq.desc)
+
+"Record_2" in seqs # returns a boolean
+```
+
+For bgzipped fasta files, a gzi file is required.
+
+```python
+seqs = SeqReaderIndexed(
+    "path/tp/seq.fa.gz",
+    "path/to/seq.fa.gz.fai",
+    "path/to/seq.fa.gz.gzi",
+)
+seq: Sequence = seqs["Record_1"]
+print(seq.id)
+print(seq.seq)
+print(seq.desc)
+
+"Record_2" in seqs # returns a boolean
+```
+
+Using an invalid key will result in `KeyError`. 
 
 ### Writing
 
