@@ -675,6 +675,7 @@ name = "rsbio-seq"
 version = "0.1.4"
 dependencies = [
  "bio",
+ "byteorder",
  "flate2",
  "pyo3",
 ]

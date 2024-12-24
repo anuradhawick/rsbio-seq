@@ -78,6 +78,41 @@ for seq in SeqReader("path/to/seq.fasta.gz"):
     print(seq.desc)
 ```
 
+### Reading Indexed Fasta
+
+Index reader supports fasta in raw text and bgzipped formats.
+
+```python
+seqs = SeqReaderIndexed(
+    "path/tp/seq.fa",
+    "path/to/seq.fa.fai"
+)
+seq: Sequence = seqs["Record_1"]
+print(seq.id)
+print(seq.seq)
+print(seq.desc)
+
+"Record_2" in seqs # returns a boolean
+```
+
+For bgzipped fasta files, a gzi file is required.
+
+```python
+seqs = SeqReaderIndexed(
+    "path/tp/seq.fa.gz",
+    "path/to/seq.fa.gz.fai",
+    "path/to/seq.fa.gz.gzi",
+)
+seq: Sequence = seqs["Record_1"]
+print(seq.id)
+print(seq.seq)
+print(seq.desc)
+
+"Record_2" in seqs # returns a boolean
+```
+
+Using an invalid key will result in `KeyError`. 
+
 ### Writing
 
 ```python

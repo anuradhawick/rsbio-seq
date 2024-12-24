@@ -1,4 +1,4 @@
-from typing import Iterator, Union, List
+from typing import Iterator, Optional, Union, List
 
 class Sequence:
     """
@@ -49,6 +49,46 @@ class SeqReader:
 
         Returns:
             Iterator[Sequence]: An iterator over sequences in the file.
+        """
+        ...
+
+class SeqReaderIndexed:
+    """
+    Sequence reader indexed.
+    """
+
+    def __init__(self, path: str, index: str, gzi: Optional[str] = None) -> None:
+        """
+        Initialise the reader with the path of the file and index.
+
+        Args:
+            path (str): The path to the file (e.g., fasta, fastq, fa, fq) and compressed formats (e.g., gz) are supported.
+            index (str): The path to the index file.
+            gzi (Optional[str]): The path to the gzip index file (gzi) if applicable.
+        """
+        ...
+
+    def __getitem__(self, id: str) -> "Sequence":
+        """
+        Retrieve a sequence record by its ID.
+
+        Args:
+            id (str): The ID of the sequence record.
+
+        Returns:
+            Sequence: The sequence record corresponding to the ID.
+        """
+        ...
+
+    def __contains__(self, id: str) -> bool:
+        """
+        Check if a sequence record with the given ID exists in the index.
+
+        Args:
+            id (str): The ID to check.
+
+        Returns:
+            bool: True if the ID exists in the index, False otherwise.
         """
         ...
 

@@ -17,6 +17,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 bio = "2.0.3"
+byteorder = "1.5.0"
 flate2 = "1.0.35"
 pyo3 = { version = "0.23.3", features = ["abi3-py39"] }
 

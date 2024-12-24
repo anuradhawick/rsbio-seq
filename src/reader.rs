@@ -1,9 +1,8 @@
+use crate::seq::{RecordSet, SeqFormat, Sequence};
 use bio::io::fasta::Reader as FastaReader;
 use bio::io::fastq::Reader as FastqReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
-
-use crate::seq::{RecordSet, SeqFormat, Sequence};
 
 pub struct Sequences<R: BufRead> {
     pub records: RecordSet<R>,
