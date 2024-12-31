@@ -94,16 +94,17 @@ class SeqReaderIndexed:
 
 class SeqWriter:
     """
-    Sequence writer.
+    Sequence writer. Enables writing sequences to a file, with optional index creation facility.
     """
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, index: bool = False) -> None:
         """
         Initialise the reader with path of the file.
 
         Args:
             path (str): The path to file fasta, fastq, fa, fq and compressed formats with gz are supported.
                         The file path is used to infer the intentded file format.
+            index (bool): Create an index file (default: False).
         """
         ...
 

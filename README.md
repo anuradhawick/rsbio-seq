@@ -78,7 +78,7 @@ for seq in SeqReader("path/to/seq.fasta.gz"):
     print(seq.desc)
 ```
 
-### Reading Indexed Fasta
+### Reading from FASTA (`fai`/`fai+gzi`) index
 
 Index reader supports fasta in raw text and bgzipped formats.
 
@@ -152,6 +152,28 @@ We provide two utility functions for your convenience.
 * `ascii_to_phred` - convert the quality string to a list of numbers
 
 RSBio-Seq reads and write quality string in ascii format only. Please use these helper functions to translate if you intend to read them.
+
+## Writing to FASTA with an Index (`fai`/`fai+gzi`)
+
+Writing FASTA with an index can be performed in plain text and compressed forms. In compressed form the compression used is `bgzip`. In addition to `fai` there will also be a `gzi` file in compressed form. You can specify to compress using `gz` suffix at the end. Index paths are automatically inferred.
+
+```python
+# Plain text
+seq = Sequence("id", "desc", "ACGT") # id, description, sequence
+writer = SeqWriter("out.fasta", True) # set index true
+writer.write(seq)
+writer.close()
+
+# Compressed
+seq = Sequence("id", "desc", "ACGT") # id, description, sequence
+writer = SeqWriter("out.fa.gz", True) # set index true
+writer.write(seq)
+writer.close()
+```
+
+## Planned soon for the major release v1.0.0
+
+* Support for `fastq` Indexes
 
 ## Authors
 

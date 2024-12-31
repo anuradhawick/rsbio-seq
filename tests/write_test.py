@@ -24,6 +24,55 @@ GGGTGATGGCCGCTGCCGATGGCGTCAAATCCCACCAAGTTACCCTTAACAACTTAAGGGTTTTCAAATAGA
     )
 
 
+def test_write_fa_index():
+    writer = SeqWriter(dir.joinpath("../test_data/out_ix.fa").as_posix(), index=True)
+    seq = Sequence(
+        "Record_1",
+        "Desc 1",
+        "GGGTGATGGCCGCTGCCGATGGCGTCAAATCCCACCAAGTTACCCTTAACAACTTAAGGGTTTTCAAATAGA",
+    )
+    writer.write(seq, 20)
+    seq = Sequence(
+        "Record_2",
+        "Desc 2",
+        "TTAACAACTTAAGGGTTTTCAAATAGAGGGTGATGGCCGCTGCCGATGGCGTCAAATCCCACCAAGTTACCC",
+    )
+    writer.write(seq, 20)
+    writer.close()
+
+    assert (
+        open(dir.joinpath("../test_data/out_ix.fa.fai").as_posix()).read()
+        == """Record_1	72	17	20	21
+Record_2	72	110	20	21
+"""
+    )
+
+
+def test_write_fa_gz_index():
+    writer = SeqWriter(dir.joinpath("../test_data/out_ix.fa.gz").as_posix(), index=True)
+    seq = Sequence(
+        "Record_1",
+        "Desc 1",
+        "GGGTGATGGCCGCTGCCGATGGCGTCAAATCCCACCAAGTTACCCTTAACAACTTAAGGGTTTTCAAATAGA",
+    )
+    writer.write(seq, 20)
+    seq = Sequence(
+        "Record_2",
+        "Desc 2",
+        "TTAACAACTTAAGGGTTTTCAAATAGAGGGTGATGGCCGCTGCCGATGGCGTCAAATCCCACCAAGTTACCC",
+    )
+    writer.write(seq, 20)
+    writer.close()
+
+    assert (
+        open(dir.joinpath("../test_data/out_ix.fa.gz.fai").as_posix()).read()
+        == """Record_1	72	17	20	21
+Record_2	72	110	20	21
+"""
+    )
+    assert dir.joinpath("../test_data/out_ix.fa.gz.gzi").exists()
+
+
 def test_write_fa_gz():
     writer = SeqWriter(dir.joinpath("../test_data/out.fa.gz").as_posix())
     seq = Sequence(

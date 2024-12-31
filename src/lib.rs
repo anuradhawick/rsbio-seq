@@ -85,9 +85,9 @@ pub struct SeqWriter {
 impl SeqWriter {
     /// Initialise a sequence writer for a file in some destination
     #[new]
-    #[pyo3(signature = (path))]
-    pub fn new(path: String) -> PyResult<Self> {
-        let writer = get_writer(&path).map_err(PyIOError::new_err)?;
+    #[pyo3(signature = (path, index=false))]
+    pub fn new(path: String, index: bool) -> PyResult<Self> {
+        let writer = get_writer(&path, index).map_err(PyIOError::new_err)?;
         let format = SeqFormat::get(&path).map_err(PyIOError::new_err)?;
 
         Ok(Self {
@@ -103,6 +103,11 @@ impl SeqWriter {
     #[pyo3(signature = ())]
     pub fn close(&mut self) -> PyResult<()> {
         self.writer.close().map_err(PyIOError::new_err)
+    }
+
+    #[pyo3(signature = ())]
+    pub fn __del__(mut slf: PyRefMut<'_, Self>) {
+        let _ = slf.close();
     }
 }
 
