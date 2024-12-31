@@ -210,11 +210,29 @@ impl IndexedReader {
                     }
                 }
             };
+            let end_index = gzi_index.binary_search_by(|&(_, uncompressed_offset)| {
+                if uncompressed_offset <= index_entry.end as u64 {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Less
+                }
+            });
+            let end_index = match end_index {
+                Ok(end) => end,
+                Err(end) => {
+                    if end < gzi_index.len() - 1 {
+                        end + 1
+                    } else {
+                        gzi_index.len() - 1
+                    }
+                }
+            };
 
             let mut reader = BufReader::new(self.file.by_ref());
             reader
                 .seek(io::SeekFrom::Start(gzi_index[start_index].0))
                 .map_err(|_| "Seek error")?;
+            let reader = reader.take(gzi_index[end_index].1 - gzi_index[start_index].0);
             let decoder = MultiGzDecoder::new(reader);
             let mut decompressed_reader = BufReader::new(decoder);
             let mut buffer = String::new();
