@@ -12,13 +12,13 @@ impl<R: BufRead> Sequences<R> {
     pub fn new(format: SeqFormat, reader: R) -> Self {
         match format {
             SeqFormat::Fastq => {
-                let fastq_reader = FastqReader::new(reader);
+                let fastq_reader = FastqReader::from_bufread(reader);
                 Sequences {
                     records: RecordSet::Fastq(fastq_reader.records()),
                 }
             }
             SeqFormat::Fasta => {
-                let fasta_reader = FastaReader::new(reader);
+                let fasta_reader = FastaReader::from_bufread(reader);
                 Sequences {
                     records: RecordSet::Fasta(fasta_reader.records()),
                 }

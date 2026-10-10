@@ -1,12 +1,12 @@
 use bio::io::fasta::Records as FastaRecords;
 use bio::io::fastq::Records as FastqRecords;
 use pyo3::prelude::*;
-use std::io::{BufRead, BufReader};
+use std::io::BufRead;
 
 // Record set entries of type R, which implement BufRead trait (stdin/file)
 pub enum RecordSet<R: BufRead> {
-    Fasta(FastaRecords<BufReader<R>>),
-    Fastq(FastqRecords<BufReader<R>>),
+    Fasta(FastaRecords<R>),
+    Fastq(FastqRecords<R>),
 }
 
 /// Sequence entry
