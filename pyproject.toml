@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.7,<2.0"]
+requires = ["maturin>=1.9.3,<2.0"]
 build-backend = "maturin"
 
 [project]
@@ -12,7 +12,8 @@ classifiers = [
 ]
 dynamic = ["version", "readme", "description", "authors"]
 keywords = ["bioinformatics", "genomics"]
-license = { file = "LICENSE" }
+license = "Apache-2.0 OR GPL-3.0-only"
+license-files = ["LICENSE", "LICENSE-APACHE", "LICENSE-GPL"]
 
 [project.urls]
 Documentation = "https://github.com/anuradhawick/rsbio-seq/"

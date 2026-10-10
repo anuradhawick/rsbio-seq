@@ -90,7 +90,10 @@ Your contribution will be reviewed before accepting it.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the GPL-3.0 license.
+By contributing, you agree that your contributions will be available under both
+the [Apache License, Version 2.0](LICENSE-APACHE) and the
+[GNU General Public License, Version 3 only](LICENSE-GPL), allowing recipients
+to choose either license (`Apache-2.0 OR GPL-3.0-only`).
 
 ## References
 
