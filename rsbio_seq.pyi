@@ -154,4 +154,15 @@ def ascii_to_phred(qual: str) -> List[int]:
     """
     ...
 
-__all__ = ["Sequence", "SeqReader", "SeqWriter", "phred_to_ascii", "ascii_to_phred"]
+def build_index(path: str) -> None:
+    """Build indexes for an existing FASTA/FASTQ file.
+
+    Writes path + ".fai" and, for BGZF .gz input, path + ".gzi".
+    Existing indexes are replaced after input validation. Ordinary gzip is
+    unsupported. Records must have unique IDs and nonempty sequences with
+    uniform wrapping except on the final line. FASTQ quality wrapping must
+    match sequence wrapping. Invalid input raises OSError.
+    """
+    ...
+
+__all__ = ["Sequence", "SeqReader", "SeqReaderIndexed", "SeqWriter", "build_index", "phred_to_ascii", "ascii_to_phred"]

@@ -1,3 +1,4 @@
+mod index_builder;
 mod io;
 mod reader;
 mod reader_indexed;
@@ -115,6 +116,11 @@ impl SeqWriter {
 }
 
 #[pyfunction]
+pub fn build_index(path: String) -> PyResult<()> {
+    index_builder::build_index(&path).map_err(|e| PyIOError::new_err(e.to_string()))
+}
+
+#[pyfunction]
 pub fn phred_to_ascii(scores: Vec<u8>) -> PyResult<String> {
     Ok(scores
         .iter()
@@ -137,6 +143,7 @@ fn rsbio_seq(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SeqReader>()?;
     m.add_class::<SeqWriter>()?;
     m.add_class::<SeqReaderIndexed>()?;
+    m.add_function(wrap_pyfunction!(build_index, m)?)?;
     m.add_function(wrap_pyfunction!(phred_to_ascii, m)?)?;
     m.add_function(wrap_pyfunction!(ascii_to_phred, m)?)?;
     Ok(())

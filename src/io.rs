@@ -1,7 +1,7 @@
 //! Buffered FASTA/FASTQ parsing inspired by klib's kseq.h:
 //! https://github.com/attractivechaos/klib/blob/master/kseq.h
 //!
-//! Reuse byte buffers, concatenate sequence lines, and consume quality by
+//! Read into owned record buffers, concatenate sequence lines, and consume quality by
 //! sequence length. This is an independent Rust implementation with strict
 //! format validation rather than kseq's permissive header scanning.
 use crate::seq::{SeqFormat, Sequence};
@@ -11,8 +11,8 @@ pub struct FastxReader<R> {
     reader: R,
     format: SeqFormat,
     line: Vec<u8>,
-    seq: Vec<u8>,
-    qual: Vec<u8>,
+    seq_capacity: usize,
+    qual_capacity: usize,
     pending_header: bool,
     finished: bool,
 }
@@ -23,8 +23,8 @@ impl<R: BufRead> FastxReader<R> {
             reader,
             format,
             line: Vec::with_capacity(256),
-            seq: Vec::with_capacity(256),
-            qual: Vec::with_capacity(256),
+            seq_capacity: 256,
+            qual_capacity: 256,
             pending_header: false,
             finished: false,
         }
@@ -34,16 +34,30 @@ impl<R: BufRead> FastxReader<R> {
     // bulk. No per-byte I/O, UTF-8 decoding, or per-line allocation is needed.
     fn read_line(&mut self) -> io::Result<bool> {
         self.line.clear();
-        if self.reader.read_until(b'\n', &mut self.line)? == 0 {
+        Self::append_line(&mut self.reader, &mut self.line)
+    }
+
+    // Append directly to the record's eventual String allocation, then remove
+    // only this line's terminator. Empty lines must not trim earlier data.
+    fn append_line(reader: &mut R, bytes: &mut Vec<u8>) -> io::Result<bool> {
+        let start = bytes.len();
+        if reader.read_until(b'\n', bytes)? == 0 {
             return Ok(false);
         }
-        if self.line.last() == Some(&b'\n') {
-            self.line.pop();
-            if self.line.last() == Some(&b'\r') {
-                self.line.pop();
+        if bytes.last() == Some(&b'\n') {
+            bytes.pop();
+            if bytes.len() > start && bytes.last() == Some(&b'\r') {
+                bytes.pop();
             }
         }
         Ok(true)
+    }
+
+    // Valid UTF-8 transfers ownership without copying. Preserve the existing
+    // replacement-character behavior for malformed UTF-8 input.
+    fn into_string(bytes: Vec<u8>) -> String {
+        String::from_utf8(bytes)
+            .unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned())
     }
 
     fn invalid(message: &str) -> io::Error {
@@ -51,8 +65,8 @@ impl<R: BufRead> FastxReader<R> {
     }
 
     /// Read one record. EOF and errors are terminal; errors never produce a
-    /// partially parsed record. Returned strings own their data while scratch
-    /// buffers retain their capacity for the next call.
+    /// partially parsed record. Sequence/quality buffers become the returned
+    /// strings; the previous record's size guides the next allocation.
     pub fn read_next(&mut self) -> io::Result<Option<Sequence>> {
         if self.finished {
             return Ok(None);
@@ -98,51 +112,60 @@ impl<R: BufRead> FastxReader<R> {
         } else {
             String::new()
         };
-        self.seq.clear();
-        self.qual.clear();
+        let mut seq = Vec::with_capacity(self.seq_capacity);
+        let mut qual = Vec::new();
         match self.format {
-            SeqFormat::Fasta => {
-                while self.read_line()? {
-                    if self.line.first() == Some(&b'>') {
-                        self.pending_header = true;
-                        break;
-                    }
-                    self.seq.extend_from_slice(&self.line);
+            SeqFormat::Fasta => loop {
+                let start = seq.len();
+                if !Self::append_line(&mut self.reader, &mut seq)? {
+                    break;
                 }
-            }
+                if seq.get(start) == Some(&b'>') {
+                    self.line.clear();
+                    self.line.extend_from_slice(&seq[start..]);
+                    seq.truncate(start);
+                    self.pending_header = true;
+                    break;
+                }
+            },
             SeqFormat::Fastq => {
                 loop {
-                    if !self.read_line()? {
+                    let start = seq.len();
+                    if !Self::append_line(&mut self.reader, &mut seq)? {
                         return Err(Self::invalid("FASTQ record is missing its '+' separator"));
                     }
-                    if self.line.first() == Some(&b'+') {
+                    if seq.get(start) == Some(&b'+') {
+                        seq.truncate(start);
                         break;
                     }
-                    if self.line.first() == Some(&b'@') {
+                    if seq.get(start) == Some(&b'@') {
                         return Err(Self::invalid("FASTQ record is missing its '+' separator"));
                     }
-                    self.seq.extend_from_slice(&self.line);
                 }
                 // Read at least one quality line, including for empty records.
+                qual.reserve(self.qual_capacity.max(seq.len().saturating_add(2)));
                 loop {
-                    if !self.read_line()? {
+                    if !Self::append_line(&mut self.reader, &mut qual)? {
                         return Err(Self::invalid("FASTQ quality string is truncated"));
                     }
-                    self.qual.extend_from_slice(&self.line);
-                    if self.qual.len() >= self.seq.len() {
+                    if qual.len() >= seq.len() {
                         break;
                     }
                 }
-                if self.qual.len() != self.seq.len() {
+                if qual.len() != seq.len() {
                     return Err(Self::invalid("FASTQ sequence and quality lengths differ"));
                 }
             }
         }
+        // Leave room for a lookahead header or '+' separator without doubling
+        // the next record's allocation when its sequence has the same length.
+        self.seq_capacity = seq.len().saturating_add(256);
+        self.qual_capacity = qual.len().saturating_add(2);
         Ok(Some(Sequence {
             id,
             desc,
-            seq: String::from_utf8_lossy(&self.seq).into_owned(),
-            qual: String::from_utf8_lossy(&self.qual).into_owned(),
+            seq: Self::into_string(seq),
+            qual: Self::into_string(qual),
         }))
     }
 }
@@ -203,6 +226,26 @@ mod tests {
         let records = parse(SeqFormat::Fasta, input.as_bytes(), 17).unwrap();
         assert_eq!(records[0].seq, bases);
         assert_eq!(records[1].seq, "N");
+    }
+
+    #[test]
+    fn direct_buffers_preserve_utf8_replacement_and_bare_carriage_returns() {
+        for capacity in [1, 7, 64 * 1024] {
+            let records =
+                parse(SeqFormat::Fasta, b">first\nAC\xff\n>second\nN\r", capacity).unwrap();
+            assert_eq!(records[0].seq, "AC\u{fffd}");
+            assert_eq!(records[1].seq, "N\r");
+
+            let records = parse(
+                SeqFormat::Fastq,
+                b"@first\nA\xff\n+first\n!\xfe\n@second\nT\n+\n@",
+                capacity,
+            )
+            .unwrap();
+            assert_eq!(records[0].seq, "A\u{fffd}");
+            assert_eq!(records[0].qual, "!\u{fffd}");
+            assert_eq!(records[1].qual, "@");
+        }
     }
 
     #[test]

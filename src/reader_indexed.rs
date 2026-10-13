@@ -1,16 +1,11 @@
-use byteorder::{LittleEndian, ReadBytesExt};
-use flate2::bufread::GzDecoder;
-
 use crate::seq::{SeqFormat, Sequence};
+use byteorder::{LittleEndian, ReadBytesExt};
+use flate2::read::MultiGzDecoder;
 use std::{
     collections::HashMap,
     fs::File,
     io::{self, BufRead, BufReader, Read, Seek},
 };
-
-pub trait SeekRead: Seek + Read + Sync + Send {}
-
-impl SeekRead for File {}
 
 #[derive(Debug, PartialEq)]
 pub struct FastXOffsets {
@@ -25,28 +20,9 @@ pub struct FastXOffsets {
 }
 
 pub struct IndexedReader {
-    // in future we may want to support fastq
-    #[allow(dead_code)]
-    format: SeqFormat,
-    file: Box<dyn SeekRead>,
+    file: File,
     index: HashMap<String, FastXOffsets>,
-    gzipped: bool,
     gzi_index: Option<Vec<(u64, u64)>>,
-}
-
-fn is_bgzf(file_path: &str) -> io::Result<bool> {
-    let mut file = File::open(file_path)?;
-    let mut header = [0u8; 18]; // Read the first 18 bytes of the header
-    file.read_exact(&mut header)?;
-
-    // Check for GZIP magic number and compression method
-    if header[0] == 0x1f && header[1] == 0x8b && header[2] == 0x08 {
-        // Check for BGZF-specific bytes at position 12 and 13
-        if header[12] == 0x42 && header[13] == 0x43 {
-            return Ok(true);
-        }
-    }
-    Ok(false)
 }
 
 impl IndexedReader {
@@ -56,318 +32,201 @@ impl IndexedReader {
         index_file: &str,
         gzi_file: Option<&str>,
     ) -> Result<Self, String> {
-        let gzipped = records_file.ends_with(".gz");
-        let mut gzi_index = None;
-        let file =
-            File::open(records_file).map_err(|_| format!("Unable to open: {}", records_file))?;
+        let file = File::open(records_file).map_err(|e| e.to_string())?;
+        let reader = BufReader::new(File::open(index_file).map_err(|e| e.to_string())?);
         let mut index = HashMap::new();
-        let index_file =
-            File::open(index_file).map_err(|_| format!("Unable to open: {}", index_file))?;
-        let reader = std::io::BufReader::new(index_file);
         let mut start = 0;
         for line in reader.lines() {
-            let line = line.map_err(|_| "Error reading index file")?;
-            let parts: Vec<&str> = line.split('\t').collect();
-            if parts.len() >= 5 {
-                let numbers: Result<Vec<usize>, _> =
-                    parts[1..].iter().map(|x| x.parse::<usize>()).collect();
-                let numbers = numbers.map_err(|_| "Error parsing offset")?;
-                if let [length, offset, line_bases, line_width] = numbers[..4] {
-                    let total_lines = length.div_ceil(line_bases);
-                    let total_chars = (total_lines - 1) * line_width
-                        + (length - (total_lines - 1) * line_bases)
-                        + 1;
-                    let end = if let Some(qual_offset) = numbers.get(4).copied() {
-                        qual_offset + total_chars - 1
-                    } else {
-                        offset + total_chars - 1
-                    };
-
-                    // we have already checked the length of parts
-                    unsafe {
-                        index.insert(
-                            parts.get_unchecked(0).to_string(),
-                            FastXOffsets {
-                                start,
-                                end,
-                                name: parts.get_unchecked(0).to_string(),
-                                length,
-                                offset,
-                                line_bases,
-                                line_width,
-                                qual_offset: numbers.get(4).copied(),
-                            },
-                        )
-                    };
-                    println!(
-                        "Total chars {}, start {}, offset {}",
-                        total_chars, start, offset
-                    );
-                    if let Some(qual_offset) = numbers.get(4).copied() {
-                        start = qual_offset + total_chars;
-                    } else {
-                        start = offset + total_chars;
-                    }
-                } else {
-                    return Err(format!("Unrecognised format in line: {}", line));
-                }
-            } else {
-                todo!("Handle other fai formats");
+            let line = line.map_err(|e| e.to_string())?;
+            let parts: Vec<_> = line.split('\t').collect();
+            let fields = match format {
+                SeqFormat::Fasta => 5,
+                SeqFormat::Fastq => 6,
+            };
+            if parts.len() != fields || parts[0].is_empty() {
+                return Err("Invalid FAI index entry".into());
             }
+            let numbers = parts[1..]
+                .iter()
+                .map(|x| x.parse::<usize>())
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| "Invalid FAI offset")?;
+            let (length, offset, line_bases, line_width) =
+                (numbers[0], numbers[1], numbers[2], numbers[3]);
+            if length == 0 || line_bases == 0 || line_width < line_bases || offset <= start {
+                return Err("Invalid FAI line geometry or offset".into());
+            }
+            let span = ((length - 1) / line_bases)
+                .checked_mul(line_width)
+                .and_then(|n| n.checked_add((length - 1) % line_bases + 1))
+                .ok_or("FAI offset overflow")?;
+            let qual_offset = numbers.get(4).copied();
+            if qual_offset.is_some_and(|q| q <= offset) {
+                return Err("Invalid FAI quality offset".into());
+            }
+            let end = qual_offset
+                .unwrap_or(offset)
+                .checked_add(span)
+                .ok_or("FAI offset overflow")?;
+            let next_start = end
+                .checked_add(line_width - line_bases)
+                .ok_or("FAI offset overflow")?;
+            let name = parts[0].to_string();
+            if index
+                .insert(
+                    name.clone(),
+                    FastXOffsets {
+                        name,
+                        start,
+                        end,
+                        length,
+                        offset,
+                        line_bases,
+                        line_width,
+                        qual_offset,
+                    },
+                )
+                .is_some()
+            {
+                return Err("Duplicate identifier in FAI index".into());
+            }
+            start = next_start;
         }
-
-        println!("Index: {:#?}", index);
-
-        if gzipped {
-            if let Ok(bgzf) = is_bgzf(records_file) {
-                if !bgzf {
-                    return Err("Gzipped file is not BGZF".to_string());
-                }
+        let gzi_index = if records_file.ends_with(".gz") {
+            let mut probe = file.try_clone().map_err(|e| e.to_string())?;
+            let mut header = [0; 12];
+            probe.read_exact(&mut header).map_err(|e| e.to_string())?;
+            if header[..4] != [31, 139, 8, 4] {
+                return Err("Gzipped file is not BGZF".into());
             }
-            let gzi_file = gzi_file.ok_or("Gzipped file requires index")?;
-            let gzi_file = File::open(gzi_file).map_err(|_| "Unable to open gzi file")?;
-            let mut reader = BufReader::new(gzi_file);
-            let no_entries = reader
+            let mut extra = vec![0; u16::from_le_bytes([header[10], header[11]]) as usize];
+            probe.read_exact(&mut extra).map_err(|e| e.to_string())?;
+            let mut p = 0;
+            let mut bgzf = false;
+            while p + 4 <= extra.len() {
+                let n = u16::from_le_bytes([extra[p + 2], extra[p + 3]]) as usize;
+                if p + 4 + n > extra.len() {
+                    return Err("Invalid BGZF header".into());
+                }
+                bgzf |= &extra[p..p + 2] == b"BC" && n == 2;
+                p += 4 + n;
+            }
+            if !bgzf || p != extra.len() {
+                return Err("Gzipped file is not BGZF".into());
+            }
+            let mut reader = BufReader::new(
+                File::open(gzi_file.ok_or("BGZF input requires a GZI index")?)
+                    .map_err(|e| e.to_string())?,
+            );
+            let count = reader
                 .read_u64::<LittleEndian>()
-                .map_err(|_| "Error reading gzi")?;
-            let mut entries: Vec<(u64, u64)> = Vec::with_capacity(no_entries as usize + 1);
-            entries.push((0, 0));
-            for _ in 0..no_entries {
-                let start = reader
+                .map_err(|e| e.to_string())?;
+            let mut entries = vec![(0, 0)];
+            for _ in 0..count {
+                let compressed = reader
                     .read_u64::<LittleEndian>()
-                    .map_err(|_| "Error reading gzi")?;
-                let end = reader
+                    .map_err(|e| e.to_string())?;
+                let uncompressed = reader
                     .read_u64::<LittleEndian>()
-                    .map_err(|_| "Error reading gzi")?;
-                entries.push((start, end));
+                    .map_err(|e| e.to_string())?;
+                let previous = entries.last().unwrap();
+                if compressed <= previous.0 || uncompressed <= previous.1 {
+                    return Err("GZI offsets must be increasing".into());
+                }
+                entries.push((compressed, uncompressed));
             }
-
-            gzi_index = Some(entries);
-        }
-
+            Some(entries)
+        } else {
+            None
+        };
         Ok(Self {
-            format,
-            gzipped,
-            file: Box::new(file),
+            file,
             index,
             gzi_index,
         })
     }
 
-    pub fn get_record(&mut self, name: &str) -> Result<Sequence, String> {
-        let index_entry = self.index.get(name).ok_or("Record not found")?;
-        let mut buffer: Vec<u8> = vec![0; index_entry.line_width];
-        let mut bytes_read = 0;
-        let mut id: String = String::new();
-        let mut desc: String = String::new();
-
-        println!("Fetching record: {}", name);
-        println!("Index entry: {:?}", index_entry);
-
-        if !self.gzipped {
-            let mut seq: Vec<u8> = vec![0; index_entry.length];
-            let mut qual: Vec<u8> = vec![
-                0;
-                if index_entry.qual_offset.is_some() {
-                    index_entry.length
-                } else {
-                    0
-                }
-            ];
-            self.file
-                .seek(std::io::SeekFrom::Start(index_entry.start as u64))
-                .map_err(|_| "Seek error")?;
-            let mut id_line = vec![0; index_entry.offset - index_entry.start - 1];
-            self.file
-                .read_exact(&mut id_line)
-                .map_err(|_| "Error reading id line")?;
-            let id_line = String::from_utf8_lossy(&id_line).into_owned();
-
-            // Parse the ID and description from the header line
-            if id_line.starts_with('>') {
-                if let Some((new_id, new_desc)) = id_line.trim_start_matches('>').split_once(' ') {
-                    id = new_id.to_string();
-                    desc = new_desc.to_string();
-                } else {
-                    id = id_line;
-                    desc = String::new();
-                }
-            } else if id_line.starts_with('@') {
-                // Fastq header line starts with '@'
-                if let Some((new_id, new_desc)) = id_line.trim_start_matches('@').split_once(' ') {
-                    id = new_id.to_string();
-                    desc = new_desc.to_string();
-                } else {
-                    id = id_line;
-                    desc = String::new();
-                }
-            } else {
-                return Err("Invalid header line".into());
-            }
-
-            // Seek to the start of the sequence data
-            self.file
-                .seek(std::io::SeekFrom::Start(index_entry.offset as u64))
-                .map_err(|_| "Seek error")?;
-
-            // Read the sequence data in chunks according to the line width and line bases
-            while bytes_read < index_entry.length {
-                // bytes that must be read in the line
-                let to_read =
-                    std::cmp::min(index_entry.line_width, index_entry.length - bytes_read);
-                let mut handle = self.file.by_ref().take(to_read as u64);
-
-                handle
-                    .read(&mut buffer)
-                    .map_err(|_| "Error reading chunk")?;
-                // bases that must be copied to the sequence
-                let to_copy =
-                    std::cmp::min(index_entry.line_bases, index_entry.length - bytes_read);
-                seq[bytes_read..bytes_read + to_copy].copy_from_slice(&buffer[..to_copy]);
-                bytes_read += to_copy;
-            }
-
-            // If the sequence has a quality score, read it as well
-            if let Some(qual_offset) = index_entry.qual_offset {
-                self.file
-                    .seek(std::io::SeekFrom::Start(qual_offset as u64))
-                    .map_err(|_| "Seek error")?;
-
-                bytes_read = 0;
-                while bytes_read < index_entry.length {
-                    // bytes that must be read in the line
-                    let to_read =
-                        std::cmp::min(index_entry.line_width, index_entry.length - bytes_read);
-                    let mut handle = self.file.by_ref().take(to_read as u64);
-
-                    handle
-                        .read(&mut buffer)
-                        .map_err(|_| "Error reading chunk")?;
-                    // bases that must be copied to the qual
-                    let to_copy =
-                        std::cmp::min(index_entry.line_bases, index_entry.length - bytes_read);
-                    qual[bytes_read..bytes_read + to_copy].copy_from_slice(&buffer[..to_copy]);
-                    bytes_read += to_copy;
-                }
-            }
-
-            Ok(Sequence {
-                id,
-                desc,
-                seq: String::from_utf8_lossy(&seq).into_owned(),
-                qual: String::from_utf8_lossy(&qual).into_owned(),
-            })
-        } else {
-            let mut seq = String::new();
-            let mut qual = String::new();
-            // find start and end of the compressed block
-            let gzi_index = self.gzi_index.as_ref().ok_or("No gzi index")?;
-            let start_index = gzi_index
-                .partition_point(|&(_, u)| u <= index_entry.start as u64)
+    // FAI offsets refer to uncompressed bytes. Start decoding at the nearest
+    // preceding BGZF block, then skip only within that block.
+    fn read_region(&mut self, offset: usize, length: usize) -> Result<Vec<u8>, String> {
+        let mut bytes = vec![0; length];
+        if let Some(entries) = &self.gzi_index {
+            let i = entries
+                .partition_point(|&(_, u)| u <= offset as u64)
                 .saturating_sub(1);
-            let end_index = (gzi_index.partition_point(|&(_, u)| u <= index_entry.end as u64) + 1)
-                .min(gzi_index.len() - 1);
-
-            // Create reader and move to offset in compressed file
-            let mut reader = BufReader::new(self.file.by_ref());
-            reader
-                .seek(io::SeekFrom::Start(gzi_index[start_index].0))
-                .map_err(|_| "Seek error")?;
-            let mut decompressed_buffer = String::new();
-
-            // Decompress each block in the range and append to the decompressed buffer
-            for (comp, uncomp) in &gzi_index[start_index..=end_index] {
-                println!("Block: {:?} {:?}", comp, uncomp);
-                let mut block_decoder = GzDecoder::new(&mut reader);
-                let mut block_decompressed_buffer = String::new();
-                block_decoder
-                    .read_to_string(&mut block_decompressed_buffer)
-                    .map_err(|_| "Block decompression error")?;
-                decompressed_buffer.push_str(&block_decompressed_buffer);
+            let (compressed, uncompressed) = entries[i];
+            self.file
+                .seek(io::SeekFrom::Start(compressed))
+                .map_err(|e| e.to_string())?;
+            let mut decoder = MultiGzDecoder::new(&mut self.file);
+            let skip = offset as u64 - uncompressed;
+            let copied = io::copy(&mut decoder.by_ref().take(skip), &mut io::sink())
+                .map_err(|e| e.to_string())?;
+            if copied != skip {
+                return Err("Truncated BGZF input".into());
             }
-
-            // Calculate the slice of the decompressed buffer that corresponds to the requested sequence
-            let decompressed_offset = index_entry.start as u64 - gzi_index[start_index].1;
-            let decompressed_end =
-                decompressed_offset + (index_entry.end as u64 - index_entry.start as u64);
-            let decompressed_slice =
-                &decompressed_buffer[decompressed_offset as usize..decompressed_end as usize];
-
-            println!("Decompressed slice: {:?}", decompressed_slice);
-
-            let mut buffer = String::new();
-            let mut recording = false;
-            let mut recording_qual = false;
-
-            for line in decompressed_slice.lines() {
-                // check if this is the valid fasta header
-                if line.starts_with('>') {
-                    let (new_id, new_desc) = if let Some((new_id, new_desc)) =
-                        line.trim().trim_start_matches('>').split_once(' ')
-                    {
-                        (new_id.to_string(), new_desc.to_string())
-                    } else {
-                        (line.trim().to_string(), String::new())
-                    };
-
-                    if new_id == name {
-                        desc = new_desc;
-                        id = new_id;
-                        recording = true;
-                        recording_qual = false;
-                        buffer.clear();
-                        continue;
-                    }
-                } else if line.starts_with('@') {
-                    let (new_id, new_desc) = if let Some((new_id, new_desc)) =
-                        line.trim().trim_start_matches('@').split_once(' ')
-                    {
-                        (new_id.to_string(), new_desc.to_string())
-                    } else {
-                        (line.trim().to_string(), String::new())
-                    };
-
-                    if new_id == name {
-                        desc = new_desc;
-                        id = new_id;
-                        recording = true;
-                        recording_qual = false;
-                        buffer.clear();
-                        continue;
-                    }
-                } else if line.starts_with('+') && line.trim().len() == 1 {
-                    recording_qual = true;
-                    recording = false;
-                    buffer.clear();
-                    continue;
-                }
-
-                // we have found the record, now we can start recording the sequence
-                if recording {
-                    // definitely the next entry, break (only possible for fasta)
-                    if line.starts_with('>') {
-                        buffer.clear();
-                        break;
-                    }
-                    seq.push_str(line.trim());
-                }
-                if recording_qual {
-                    // definitely the next entry, break (only possible for fastq)
-                    if line.starts_with('@') {
-                        buffer.clear();
-                        break;
-                    }
-                    qual.push_str(line.trim());
-                }
-            }
-
-            Ok(Sequence {
-                id,
-                desc,
-                seq,
-                qual,
-            })
+            decoder.read_exact(&mut bytes).map_err(|e| e.to_string())?;
+        } else {
+            self.file
+                .seek(io::SeekFrom::Start(offset as u64))
+                .map_err(|e| e.to_string())?;
+            self.file
+                .read_exact(&mut bytes)
+                .map_err(|e| e.to_string())?;
         }
+        Ok(bytes)
+    }
+
+    pub fn get_record(&mut self, name: &str) -> Result<Sequence, String> {
+        let entry = self.index.get(name).ok_or("Record not found")?;
+        let (start, offset, length, bases, width, qual_offset) = (
+            entry.start,
+            entry.offset,
+            entry.length,
+            entry.line_bases,
+            entry.line_width,
+            entry.qual_offset,
+        );
+        let header = self.read_region(start, offset - start)?;
+        let header = std::str::from_utf8(&header)
+            .map_err(|e| e.to_string())?
+            .trim_end_matches(['\r', '\n']);
+        if !header.starts_with(['>', '@']) {
+            return Err("Invalid record header".into());
+        }
+        let header = &header[1..];
+        let split = header.find(char::is_whitespace).unwrap_or(header.len());
+        let id = header[..split].to_string();
+        let desc = if split < header.len() {
+            header[split + 1..].to_string()
+        } else {
+            String::new()
+        };
+        if id != name {
+            return Err("FAI index does not match record header".into());
+        }
+        let span = ((length - 1) / bases) * width + (length - 1) % bases + 1;
+        let seq = self.read_bases(offset, span, length)?;
+        let qual = if let Some(offset) = qual_offset {
+            self.read_bases(offset, span, length)?
+        } else {
+            String::new()
+        };
+        Ok(Sequence {
+            id,
+            desc,
+            seq,
+            qual,
+        })
+    }
+
+    fn read_bases(&mut self, offset: usize, span: usize, length: usize) -> Result<String, String> {
+        let mut bytes = self.read_region(offset, span)?;
+        bytes.retain(|&b| b != b'\r' && b != b'\n');
+        if bytes.len() != length {
+            return Err("FAI index does not match sequence line geometry".into());
+        }
+        String::from_utf8(bytes).map_err(|e| e.to_string())
     }
 
     pub fn has_record(&self, name: &str) -> bool {

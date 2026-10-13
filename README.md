@@ -17,11 +17,22 @@
 </pre>
 </div>
 
-RSBio-Seq reads and writes FASTA and FASTQ files in plain text (`fasta`, `fa`, `fna`, `fastq`, `fq`) and compressed formats (`.gz`). Indexed reading and writing are supported for both FASTA and FASTQ, including BGZF-compressed files.
+RSBio-Seq reads and writes FASTA (`.fasta`, `.fa`, `.fna`) and FASTQ
+(`.fastq`, `.fq`) files. Append `.gz` for compressed files. File format is
+inferred from these lowercase filename extensions; `.bgz` and `.bgzf` suffixes
+are not supported.
+
+| Operation | Plain text | Ordinary gzip (`.gz`) | BGZF (`.gz`) |
+| --- | --- | --- | --- |
+| Sequential reading | Supported | Supported | Supported |
+| Indexed reading | Requires `.fai` | Unsupported | Requires `.fai` and `.gzi` |
+| Building indexes for existing files | Creates `.fai` | Unsupported | Creates `.fai` and `.gzi` |
+| Writing | Supported | Use `index=False` (default) | Use `index=True`; also creates `.fai` and `.gzi` |
 
 The sequential reader uses a buffered Rust parser in `src/io.rs`, inspired by
 [klib's kseq.h](https://github.com/attractivechaos/klib/blob/master/kseq.h),
-with reusable byte buffers and support for wrapped FASTA/FASTQ records, LF/CRLF
+with direct reads into record buffers that become owned strings, and support
+for wrapped FASTA/FASTQ records, LF/CRLF
 line endings, and concatenated gzip members (including BGZF). FASTQ quality
 length must match sequence length; malformed input raises `OSError` during
 iteration. The library does not depend on the Rust `bio` crate.
@@ -44,11 +55,18 @@ To build from source, make sure you have the following programs installed.
 - Maturin - https://www.maturin.rs/installation
 - Python environment with Python >=3.9 - https://www.python.org/downloads/
 
-To build and install the development version of the wheel.
+From a checkout of this repository, create and activate a virtual environment,
+then install Maturin and build the extension into that environment:
 
 ```bash
-maturin develop # this installs the development version in the env
-maturin develop --release # this installs a release version in the env
+python -m venv .venv
+# Linux/macOS
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install "maturin>=1.9.3,<2.0"
+maturin develop
+# Optional optimized build:
+maturin develop --release
 ```
 
 To build a release mode wheel for installation, use this command.
@@ -57,10 +75,11 @@ To build a release mode wheel for installation, use this command.
 maturin build --release
 ```
 
-You will find the `whl` file inside the `target/wheels` directory. Your `whl` file will have a name depicting your python environment and CPU architecture. The built wheel can be installed using this command.
+The wheel is written to `target/wheels`. Install the wheel matching your platform
+and Python version (replace the placeholder with the actual filename):
 
 ```bash
-pip install target/wheels/*.whl
+python -m pip install "target/wheels/<wheel-filename>.whl"
 ```
 
 ## Usage
@@ -78,11 +97,23 @@ seq: Sequence
 for seq in SeqReader("path/to/seq.fasta.gz"):
     print(seq.id)
     print(seq.seq)
-    # for fastq quality line
-    print(seq.qual) # prints IIII
-    print(ascii_to_phred(seq.qual)) # prints [40, 40, 40, 40]
+    # FASTA records have an empty quality string.
+    print(seq.qual)  # prints an empty line
     # optional description attribute
     print(seq.desc)
+```
+
+For FASTQ, `qual` contains the quality string. For example, `"IIII"` decodes
+to four Phred scores of 40:
+
+```python
+from rsbio_seq import SeqReader, ascii_to_phred
+
+for seq in SeqReader("path/to/seq.fastq.gz"):
+    print(seq.qual)
+    print(ascii_to_phred(seq.qual))
+
+assert ascii_to_phred("IIII") == [40, 40, 40, 40]
 ```
 
 ### Reading from FASTA or FASTQ (`fai`/`fai+gzi`) indexes
@@ -139,7 +170,29 @@ print(read.seq)
 print(read.qual)
 ```
 
-Using an invalid key will result in `KeyError`. 
+A missing record ID raises `KeyError`. Errors opening the file or loading its
+indexes raise `OSError`.
+
+### Indexing existing files
+
+```python
+from rsbio_seq import build_index, SeqReaderIndexed
+
+build_index("reads.fa")  # creates reads.fa.fai
+build_index("reads.fq.gz")  # BGZF input; creates .fai and .gzi
+reads = SeqReaderIndexed("reads.fq.gz", "reads.fq.gz.fai", "reads.fq.gz.gzi")
+read = reads["Read_1"]
+```
+
+`build_index(path)` indexes an existing file without rewriting it. Compressed
+input must be BGZF; ordinary gzip raises `OSError`. Existing indexes are replaced
+after input validation. Record IDs are the first whitespace-delimited token
+following `>` or `@` in the header. Indexing requires unique IDs, nonempty
+sequences, no blank lines, and sequence lines without whitespace. Each record
+must use consistent line widths and LF or CRLF endings, except that the final
+line may be shorter or have no newline. FASTQ quality length and wrapping must
+match the sequence. Invalid or truncated input raises `OSError`. Rebuild the
+indexes if the input file changes.
 
 ### Writing
 
@@ -172,20 +225,36 @@ writer.write(seq)
 writer.close()
 ```
 
-Note: `close()` is only required if you want to read the file again in the same function/code scope. Closing opened files is a good practice either way.
+Call `writer.close()` after the last write to finalize the output and any
+indexes, especially the `.gzi` index for BGZF output. Close a writer only once
+and do not write to it afterward. Creating a writer replaces any existing file
+at the output path.
+
+For FASTQ, supply a quality string with exactly one character per sequence base;
+the writer does not validate these lengths. Use ASCII sequence and quality
+strings without embedded line breaks, and IDs without whitespace. For indexed
+output, use unique IDs and nonempty sequences. FASTA output ignores `qual`.
 
 We provide two utility functions for your convenience.
 
 * `phred_to_ascii` - convert phred scores list of numbers to a string
 * `ascii_to_phred` - convert the quality string to a list of numbers
 
-RSBio-Seq reads and write quality string in ascii format only. Please use these helper functions to translate if you intend to read them.
+Quality strings use ASCII characters. These helpers convert between quality
+strings and numerical scores using Phred+33 encoding. For standard printable
+FASTQ qualities, use scores from 0 to 93.
 
 ### Writing FASTA or FASTQ with indexes (`fai`/`fai+gzi`)
 
-Set `index=True` to write a FASTA or FASTQ file with a `.fai` index. A `.gz` suffix selects BGZF compression and also creates a `.gzi` index. Index paths are inferred from the output filename. Call `close()` to finish writing the file and indexes before reading them.
+Set `index=True` to write a FASTA or FASTQ file with a `.fai` index. With
+`index=True`, a `.gz` suffix selects BGZF compression and also creates a `.gzi`
+index. With `index=False`, `.gz` output uses ordinary gzip. Index paths are
+inferred from the output filename. Call `close()` to finish writing the file and
+indexes before reading them.
 
 ```python
+from rsbio_seq import SeqWriter, Sequence
+
 # Plain text
 seq = Sequence("id", "desc", "ACGT") # id, description, sequence
 writer = SeqWriter("out.fasta", index=True)
