@@ -27,7 +27,7 @@ def worker(args):
     else:
         sys.path.insert(0, args.module_path)
         import rsbio_seq
-        version = "1.0.0"
+        version = "1.1.0"
 
         def scan():
             return sum(1 for _ in rsbio_seq.SeqReader(args.input))
