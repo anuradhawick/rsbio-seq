@@ -1,3 +1,4 @@
+mod io;
 mod reader;
 mod reader_indexed;
 mod seq;
@@ -38,8 +39,10 @@ impl SeqReader {
     }
 
     /// Iterate through sequences
-    pub fn __next__(mut slf: PyRefMut<'_, Self>) -> Option<Sequence> {
-        slf.records.next()
+    pub fn __next__(mut slf: PyRefMut<'_, Self>) -> PyResult<Option<Sequence>> {
+        slf.records
+            .read_next()
+            .map_err(|e| PyIOError::new_err(e.to_string()))
     }
 }
 

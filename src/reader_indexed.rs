@@ -1,4 +1,3 @@
-use bio::data_structures::suffix_array::SuffixArray;
 use byteorder::{LittleEndian, ReadBytesExt};
 use flate2::bufread::GzDecoder;
 
@@ -78,7 +77,7 @@ impl IndexedReader {
                     let total_chars = (total_lines - 1) * line_width
                         + (length - (total_lines - 1) * line_bases)
                         + 1;
-                    let end = if let Some(qual_offset) = numbers.get(4) {
+                    let end = if let Some(qual_offset) = numbers.get(4).copied() {
                         qual_offset + total_chars - 1
                     } else {
                         offset + total_chars - 1
@@ -96,7 +95,7 @@ impl IndexedReader {
                                 offset,
                                 line_bases,
                                 line_width,
-                                qual_offset: numbers.get(4),
+                                qual_offset: numbers.get(4).copied(),
                             },
                         )
                     };
@@ -104,7 +103,7 @@ impl IndexedReader {
                         "Total chars {}, start {}, offset {}",
                         total_chars, start, offset
                     );
-                    if let Some(qual_offset) = numbers.get(4) {
+                    if let Some(qual_offset) = numbers.get(4).copied() {
                         start = qual_offset + total_chars;
                     } else {
                         start = offset + total_chars;
@@ -418,22 +417,22 @@ mod reader_indexed_fasta_tests {
 
     fn assert_records(reader: &mut IndexedReader) {
         // Use the sequential FASTA parser as an independent sequence reference.
-        let records: Vec<_> = bio::io::fasta::Reader::from_file("test_data/reads_indexable.fa")
-            .unwrap()
-            .records()
-            .map(Result::unwrap)
-            .collect();
+        let records: Vec<_> = crate::reader::Sequences::new(
+            SeqFormat::Fasta,
+            crate::reader::get_reader("test_data/reads_indexable.fa").unwrap(),
+        )
+        .collect();
 
         // Read out of order, including records crossing BGZF block boundaries
         // and repeated lookups to check that each read seeks independently.
         for index in [0, 1, 6, 2, 5, 4, 3, 0] {
             let expected = &records[index];
             assert_eq!(
-                reader.get_record(expected.id()).unwrap(),
+                reader.get_record(expected.id.as_str()).unwrap(),
                 Sequence {
-                    id: expected.id().to_string(),
-                    desc: expected.desc().unwrap().to_string(),
-                    seq: String::from_utf8(expected.seq().to_vec()).unwrap(),
+                    id: expected.id.as_str().to_string(),
+                    desc: expected.desc.as_str().to_string(),
+                    seq: expected.seq.clone(),
                     qual: String::new(),
                 }
             );
@@ -531,24 +530,24 @@ mod reader_indexed_fastq_tests {
 
     fn assert_records(reader: &mut IndexedReader) {
         // Use the matching FASTA fixture as an independent sequence reference.
-        let records: Vec<_> = bio::io::fasta::Reader::from_file("test_data/reads_indexable.fa")
-            .unwrap()
-            .records()
-            .map(Result::unwrap)
-            .collect();
+        let records: Vec<_> = crate::reader::Sequences::new(
+            SeqFormat::Fasta,
+            crate::reader::get_reader("test_data/reads_indexable.fa").unwrap(),
+        )
+        .collect();
 
         // Read out of order, including records crossing BGZF block boundaries
         // and repeated lookups to check that each read seeks independently.
         for index in [0, 1, 6, 2, 5, 4, 3, 0] {
             let expected = &records[index];
-            let length = expected.seq().len();
+            let length = expected.seq.len();
             let qual = "!5I@+".repeat(length.div_ceil(5));
             assert_eq!(
-                reader.get_record(expected.id()).unwrap(),
+                reader.get_record(expected.id.as_str()).unwrap(),
                 Sequence {
-                    id: expected.id().to_string(),
-                    desc: expected.desc().unwrap().to_string(),
-                    seq: String::from_utf8(expected.seq().to_vec()).unwrap(),
+                    id: expected.id.as_str().to_string(),
+                    desc: expected.desc.as_str().to_string(),
+                    seq: expected.seq.clone(),
                     qual: qual[..length].to_string(),
                 }
             );

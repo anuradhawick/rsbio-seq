@@ -6,7 +6,7 @@ authors = [
     "Anuradha Wickramarachchi <anuradhawick@gmail.com>",
     "Vijini Mallawaarachchi <viji.mallawaarachchi@gmail.com>",
 ]
-description = "RSBio-Seq is a fast and light-weight sequence reading library (built on top of rust bio crate)."
+description = "RSBio-Seq is a fast and light-weight sequence reading library."
 readme = "README.md"
 license = "Apache-2.0 OR GPL-3.0-only"
 
@@ -17,7 +17,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 bgzip = "0.3.1"
-bio = "4.2.1"
 byteorder = "1.5.0"
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
 pyo3 = { version = "0.29.3", features = ["abi3-py39"] }

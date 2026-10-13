@@ -1,29 +1,21 @@
-use crate::seq::{RecordSet, SeqFormat, Sequence};
-use bio::io::fasta::Reader as FastaReader;
-use bio::io::fastq::Reader as FastqReader;
+use crate::io::FastxReader;
+use crate::seq::{SeqFormat, Sequence};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read};
 
 pub struct Sequences<R: BufRead> {
-    pub records: RecordSet<R>,
+    records: FastxReader<R>,
 }
 
 impl<R: BufRead> Sequences<R> {
     pub fn new(format: SeqFormat, reader: R) -> Self {
-        match format {
-            SeqFormat::Fastq => {
-                let fastq_reader = FastqReader::from_bufread(reader);
-                Sequences {
-                    records: RecordSet::Fastq(fastq_reader.records()),
-                }
-            }
-            SeqFormat::Fasta => {
-                let fasta_reader = FastaReader::from_bufread(reader);
-                Sequences {
-                    records: RecordSet::Fasta(fasta_reader.records()),
-                }
-            }
+        Self {
+            records: FastxReader::new(format, reader),
         }
+    }
+
+    pub fn read_next(&mut self) -> io::Result<Option<Sequence>> {
+        self.records.read_next()
     }
 }
 
@@ -31,55 +23,19 @@ impl<R: BufRead> Iterator for Sequences<R> {
     type Item = Sequence;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // records do not have a common trait to get id and seq, we can create one
-        // but this looks simpler for the time being
-        match self.records {
-            RecordSet::Fastq(ref mut records) => {
-                let next_record = records.next();
-                if let Some(record) = next_record {
-                    let record = record.unwrap();
-                    return Some(Sequence {
-                        id: record.id().to_string(),
-                        desc: record.desc().unwrap_or("").to_string(),
-                        seq: String::from_utf8_lossy(record.seq()).to_string(),
-                        qual: String::from_utf8_lossy(record.qual()).to_string(),
-                    });
-                }
-                None
-            }
-            RecordSet::Fasta(ref mut records) => {
-                let next_record = records.next();
-                if let Some(record) = next_record {
-                    let record = record.unwrap();
-                    return Some(Sequence {
-                        id: record.id().to_string(),
-                        desc: record.desc().unwrap_or("").to_string(),
-                        seq: String::from_utf8_lossy(record.seq()).to_string(),
-                        qual: "".into(),
-                    });
-                }
-                None
-            }
-        }
-    }
-
-    fn count(self) -> usize
-    where
-        Self: Sized,
-    {
-        unimplemented!("Count cannot be performed without always having a rewindable input stream, stdin is not!");
+        self.read_next().expect("Error reading sequence")
     }
 }
 
 pub fn get_reader(path: &str) -> Result<BufReader<Box<dyn Read + Sync + Send>>, String> {
-    let is_zip = path.ends_with(".gz");
-    let file = File::open(path).map_err(|_| format!("Unable to open: {}", path))?;
-    if is_zip {
-        let decoder = flate2::read::GzDecoder::new(file);
-        Ok(BufReader::new(Box::new(decoder)))
+    let file = File::open(path).map_err(|e| format!("Unable to open {}: {}", path, e))?;
+    let input: Box<dyn Read + Sync + Send> = if path.ends_with(".gz") {
+        // Gzip members include BGZF blocks; decode all members, not just the first.
+        Box::new(flate2::read::MultiGzDecoder::new(file))
     } else {
-        Ok(BufReader::new(Box::new(file)))
-    }
+        Box::new(file)
+    };
+    Ok(BufReader::with_capacity(64 * 1024, input))
 }
 
 #[cfg(test)]

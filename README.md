@@ -19,6 +19,13 @@
 
 RSBio-Seq reads and writes FASTA and FASTQ files in plain text (`fasta`, `fa`, `fna`, `fastq`, `fq`) and compressed formats (`.gz`). Indexed reading and writing are supported for both FASTA and FASTQ, including BGZF-compressed files.
 
+The sequential reader uses a buffered Rust parser in `src/io.rs`, inspired by
+[klib's kseq.h](https://github.com/attractivechaos/klib/blob/master/kseq.h),
+with reusable byte buffers and support for wrapped FASTA/FASTQ records, LF/CRLF
+line endings, and concatenated gzip members (including BGZF). FASTQ quality
+length must match sequence length; malformed input raises `OSError` during
+iteration. The library does not depend on the Rust `bio` crate.
+
 ## Installation
 
 ### 1. From PyPI (Recommended)
